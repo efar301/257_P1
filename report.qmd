@@ -1,0 +1,124 @@
+---
+title: "Is the Devil in the Details?"
+# subtitle: "Maybe..."
+author: "Evan Farnsworth"
+thanks: "Project repository available at: [https://github.com/efar301/257_P1](https://github.com/efar301/257_P1)."
+date: today
+date-format: long
+abstract: "This project aimed to discover whether factor analysis can create latent variables that represent the hidden unerlying variables that affect the total amount of loss that an insured can incur. From the findings, it seems there are two latent variables, \"driver skill\" and \"vehicle specifications\" that influence an insureds total loss. Performing regression on the factors leads and the control variables leads to the exact same training and test error, meaning that these factors reasonable approximate the full data."
+format: pdf
+bibliography: references.bib
+number-sections: true
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+## Introduction
+
+The total loss that an insured has incurred is plainly stated as the total cost of all accidents that an insured has incurred in a period of time. Insurance companies collect hundreds and thousands of variables in order to potentially predict the total loss than an insured may incur, so that they can optimally price an insurance policy. However, models incorporating many of these variables can be difficult to interpret, making a meaninful understanding of the underlying reasons that predict changes in an insured's total loss difficult. 
+
+Compressing these variables into fewer, more explanatory variables would make model interpretation easier, and allow for insurers to have an easier time creating more accurate models. Factor analysis is a linear dimensionality technique that creates factors, which are linear combinations of known variables to create latent factors that approximately represent the same variables. The loadings that the created factors have can be interpreted to hold some general meaning about the populace that the variables represent, thus making their interpretations potentially easier than the variables they represent.
+
+This project aims to discover if a latent representation of many variables can be used to make meaningful simpliciations to fitted regression models in such a way that makes them more interpretable. Interpretable models leads to a more meaningful inference, and thus a potentially more useful model.
+
+
+## Data
+The dataset chosen for this task was "A detailed dataset of motor insurance policies with coverage specific financial information" [@data]. It consists of 354,140 rows and 47 variables. Each row is a policy transaction, meaning a single insurance policy and its status over the year the data was collected. Each policy is tied to one vehicle only. While this dataset ranges from the years 2022 to 2024, this project only focuses on the year 2022 for brevity, meaning that a total of 3631 observations are used.
+
+The data was collected from a Spanish insurance company, and of the 354,140 observations, >185,000 of them are unique insured policies. The remaining observations are customers who continue their plan with the insurance company for multiple years. Each of the observations is anonymized, normalized, and had its range validated by the creators of the dataset. Because the data is limited to a single insurance company located in Europe, the conclusions from the study are limited to conclusions in the European insurance market.
+
+For this project, the five variables chosen were `total_incurred`, `vehicle_age`, `vehicle_value`, `power_to_weight_ratio`, `driver_age`, `years_licensed`. `years_licensed` is derived as 
+
+$$
+\texttt{years\_licensed} = \texttt{driver\_age} - \texttt{age\_driving\_license}
+$$
+where `age_driving_license` is the age at which an insured earned their drivers license. 
+
+For the regression aspect of the project, `total_incurred` was the response variable, and the other five variables were the control variables to predict `total_loss`. The factor model also used `total_incurred` as the response, with two latent factors being the predictors. 
+
+For this project, we only tried to predict the total loss for active CC policies (third party coverage with two additional coverages) in the year 2022. The policies were filtered to have a total loss greater than zero. This was done to remove a large point mass at zero total loss. A total of 3232 rows of the dataset were used.
+
+## Methods
+
+Factor analysis is a dimensionality reduction technique that mainly tries to approximate the covariance matrix of our data using a factor model. The factor model is described as
+
+$$
+    X = \mu + LF + \epsilon
+$$
+where $\mu$ is the vector of means, $\epsilon$ is the vector of errors, $F$ is the vector of factors, and $L$ is the loading matrix. We assume that $F$ and $\epsilon$ are independent, $E[F]$ = 0, $Cov(F) = I$, and $Cov(\epsilon) = \Psi$ where $\Psi$ is diagonal. Factor analysis was applied to five variables in order to summarize them into two latent factors. 
+
+From there, multiple linear regression was applied in order to determine the effectiveness the factors in summarizing the data. The regression model used was
+
+$$
+    Y = \beta_0 + \beta_1X_1 + \beta_2X_2 + \dots + \beta_5X_5
+$$
+where $\beta_0$ is the intercept parameter, and $\beta_i, ~ i > 0$ is a slope parameter for a specific $X$. Each $\beta_i$ represents a change in the expected value of $Y$ given each other variable $X$ is held constant. In the factor model, the model has two variables, and in the standard model, there are five variables.
+
+In order for multiple linear regression to be used, we assume that there is a linear relationship between the variables and $Y$, the errors are independent and normal with a mean of 0, and the variance among errors is equal. These assumptions can be relaxed if the sample size is sufficiently large. 
+
+The regression models were tested using the traditional train/test split, with 80% of the data being used for training, and 20% being used for testing. For factor regression, the test data was fitted to the same loadings that were developed fro m the training data, and then was regressed upon. 
+
+R [@r] is used for the analysis and plotting.
+
+## Results
+The two factors seems to summarize the data into two meaningful categories, "driver skill" and "vehicle specifications", with one caveat. The loadings for the factors are below.
+
+| Variable              | Factor 1 | Factor 2 |
+|-----------------------|----------|----------|
+| power_to_weight_ratio | ~0       | -0.429   |
+| years_licensed        | 0.999    | ~0       |
+| vehicle_age           | 0.999    | ~0       |
+| vehicle_value         | ~0       | 0.996    |
+| driver_age            | 0.846    | ~0       |
+
+: Factor loadings
+
+
+
+
+We can see that factor one has large loadings for `driver_age`, `years_licensed` and interestingly `vehicle_age`. Factor 2 has large loadings for `power_to_weight_ratio` and `vehicle_value`. Because factor 1 contains such a large loading for vehicle age, which is not necessarily related to "driver skill", it can also be assumed that factor 1 related to "years on the road". Howerver, we interpret the variable more intuitively as "driver skill".
+
+Hence, fitting the regression models on the training set, one with the five control variables and one with the two factors derived from the control variables yields the rest results below.
+
+| Model   | Training RMSE | Test RMSE |
+|---------|---------------|-----------|
+| Factors |     4,956.119 | 6,452.169 |
+| Control |     4,956.052 | 6,452.730 |
+
+: Model root mean squared errors
+
+Both model results are virtually identical, telling us that the factor model summarized the data well enough such that the two, more explainable latent variables give the same error and result as the control model. This means that we can more easily interpret the factor model while achieving the same results as the control model with far more variables.
+
+The final parameterizations of the models are below.
+
+| Term                  | Factor model | Original-variable model |
+|-----------------------|-------------:|------------------------:|
+| Intercept             |     1,470.49 |                1,723.23 |
+| Factor 1              |       115.01 |                       — |
+| Factor 2              |      −216.52 |                       — |
+| years_licensed        |            — |                  133.82 |
+| vehicle_age           |            — |                 −123.72 |
+| power_to_weight_ratio |            — |                  −0.973 |
+| vehicle_value         |            — |                 −0.0201 |
+| driver_age            |            — |                   0.828 |
+
+: Estimated regression coefficients
+
+The factor model parameters can be interpreted as "The expected change in the total loss for a one unit increase in either driver skill or vehicle specifications given the other factor is held constant". This is much simpler to interpet than "The expected change in total loss for a one unit increase in `years_licensed` (or any other variable) holding all other variables constant".
+
+## Conclusion
+
+The factor model achieves the same prediction error on the testing set as the control model, making the factor model more valuable, as it is easier to interpet. The factors conveniently summarize the data into more explainable and interpretable meanings that the control model simply cannot do.
+
+While this method was only tested on five variables, it can potentially be extended to many more. Furthermore, this method was only tested on a multiple linear regression model, but an extension to a GLM framework can potentially make GLM's more interpretable when including many parameters. 
+
+This method does have caveats and restrictions however. The variables must all be continous, and there must be some meaningful linear relationship between the variables. Furthermore, the interpretation of a one unit increase in a latent variable can be difficult as well.
+
+
+
+{{< pagebreak >}}
+
+## References
+
